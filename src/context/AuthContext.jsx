@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase/config";
+import { auth } from '../firebase/config.js';
 import axios from "axios";
+import { toast } from 'react-hot-toast';
 
 const AuthContext = createContext(null);
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -13,70 +13,86 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Listen for authentication state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const token = await firebaseUser.getIdToken();
-        try {
-          // Fetch user profile from your backend
-          const response = await axios.get(`${API_URL}/users/profile`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-
-          const userData = { ...firebaseUser, ...response.data };
-          setUser(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
-          localStorage.setItem('token', token);
-        } catch (profileError) {
-          console.error("Error fetching user data:", profileError);
-          setUser(firebaseUser);
-          localStorage.setItem('user', JSON.stringify(firebaseUser));
-          localStorage.setItem('token', token);
-        }
-      } else {
-        setUser(null);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    
+    if (token && savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  const signup = async (email, password, name) => {
     try {
       setLoading(true);
       setError(null);
-      await signInWithEmailAndPassword(auth, email, password);
-      return { success: true };
+
+      const response = await axios.post(`${API_URL}/signup`, {
+        name,
+        email,
+        password
+      });
+
+      if (response.data.success) {
+        toast.success('Registration successful! Please verify your email.');
+        return { success: true };
+      } else {
+        throw new Error(response.data.message);
+      }
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error.message);
-      return { success: false, error: error.message };
+      console.error("Signup error:", error);
+      toast.error(error.response?.data?.message || error.message);
+      return { success: false, error };
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = async () => {
+  const login = async (email, password) => {
     try {
-      await signOut(auth);
-      setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      navigate('/');
+      setLoading(true);
+      setError(null);
+      
+      const response = await axios.post(`${API_URL}/login`, {
+        email,
+        password
+      });
+
+      if (response.data.token) {
+        const userData = response.data.user;
+        setUser(userData);
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        toast.success('Login successful!');
+        
+        // The navigation will be handled in the SignIn component
+        return { success: true, user: userData };
+      }
+      
+      throw new Error('Login failed');
     } catch (error) {
-      console.error('Logout error:', error);
-      setError(error.message);
+      console.error("Login error:", error);
+      toast.error(error.response?.data?.message || error.message);
+      return { success: false, error };
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    navigate('/sign-in');
+    toast.success('Logged out successfully');
   };
 
   const value = {
     user,
     loading,
     error,
+    signup,
     login,
     logout,
     isAuthenticated: !!user

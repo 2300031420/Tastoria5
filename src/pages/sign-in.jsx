@@ -64,31 +64,14 @@ export function SignIn() {
     setIsLoading(true);
 
     try {
-      // Basic validation
-      if (!email.trim() || !password.trim()) {
-        setError("Please fill in all fields");
-        setIsLoading(false);
-        return;
-      }
-
-      // Email format validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        setError("Please enter a valid email address");
-        setIsLoading(false);
-        return;
-      }
-
       const result = await login(email, password);
       
       if (result?.success) {
         console.log('Login successful:', result.user);
         
-        // Small delay to ensure state is updated
-        setTimeout(() => {
-          const redirectPath = from || '/profile';
-          navigate(redirectPath, { replace: true });
-        }, 100);
+        // Navigate to home page or the original requested page
+        const redirectPath = from || '/';  // Changed from '/profile' to '/'
+        navigate(redirectPath, { replace: true });
       } else {
         setError(result?.error?.message || 'Failed to sign in');
       }
@@ -103,11 +86,59 @@ export function SignIn() {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
-      handleSuccessfulLogin(result.user);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      console.log('Google Auth User Data:', user); // Debug log
+
+      // Fix the API URL - remove the duplicate 'api'
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: user.displayName,
+          email: user.email,
+          googleId: user.uid,
+          photoUrl: user.photoURL,
+          emailVerified: user.emailVerified
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to sign in with Google');
+      }
+
+      const data = await response.json();
+      console.log('Backend Response:', data); // Debug log
+
+      // Store user data in localStorage
+      const userData = {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        photoURL: data.user.photoUrl,
+        role: data.user.role
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', data.token);
+
+      toast.success('Signed in with Google successfully!', {
+        id: 'auth-status'
+      });
+
+      // Navigate to home or intended page
+      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/';
+      localStorage.removeItem('redirectAfterLogin');
+      navigate(redirectPath, { replace: true });
+
     } catch (error) {
       console.error('Google sign-in error:', error);
-      toast.error('Failed to sign in with Google', {
+      toast.error(error.message || 'Failed to sign in with Google', {
         id: 'auth-status'
       });
     } finally {

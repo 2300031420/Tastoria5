@@ -83,7 +83,7 @@ export function SignUp() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/verify-otp', {
+      const response = await fetch('http://localhost:5000/api/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,11 +112,14 @@ export function SignUp() {
 
   const handleGoogleSignUp = async () => {
     try {
+      setIsLoading(true);
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      
+      console.log('Google Auth User Data:', user);
 
-      const response = await fetch('http://localhost:5000/api/users/google', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,18 +128,24 @@ export function SignUp() {
           name: user.displayName,
           email: user.email,
           googleId: user.uid,
-          photoUrl: user.photoURL
+          photoUrl: user.photoURL,
+          emailVerified: user.emailVerified
         })
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success('Account created successfully!');
-        navigate('/sign-in');
-      } else {
-        throw new Error(data.message || 'Failed to register');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to register with Google');
       }
+
+      const data = await response.json();
+      console.log('Backend Response:', data);
+
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('token', data.token);
+      
+      toast.success('Google sign-in successful!');
+      navigate('/');
     } catch (error) {
       console.error('Google signup error:', error);
       if (error.code === 'auth/popup-closed-by-user') {
@@ -144,6 +153,8 @@ export function SignUp() {
       } else {
         toast.error(error.message || 'Google sign-up failed');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 

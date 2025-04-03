@@ -32,16 +32,30 @@ export function Navbar({ brandName, routes = [], action }) {
   const [cartQuantity, setCartQuantity] = useState(0);
 
   const hideNavigationRoutes = [
-    '/cafes',           // Book a Table page
-    '/preorder',        // Preorder page
-    '/qr-scanner',      // QR Scanner page
-    '/sign-in',         // Sign In page
-    '/sign-up',         // Sign Up page
-    '/profile'          // Profile page
+    '/cafes',
+    '/preorder',
+    '/qr-scanner',
+    '/sign-in',
+    '/sign-up',
+    '/profile',
+    '/admin-login',
+    '/admin',
+    '/slot-booking',
+    '/scanner',
+    '/orders',
+    '/cart',
+    '/menu',
+    '/payment',
+    '/booking'
   ];
 
-  // Check if navbar should be hidden on current route
-  const shouldHideNavbar = hideNavigationRoutes.includes(location.pathname);
+  // Update the shouldHideNavbar check
+  const shouldHideNavbar = hideNavigationRoutes.some(route => 
+    // Check if the current path starts with any of the hide routes
+    location.pathname.startsWith(route) ||
+    // Handle wildcard routes
+    (route.endsWith('*') && location.pathname.startsWith(route.slice(0, -1)))
+  );
 
   // Define isHomePage based on current location
   const isHomePage = location.pathname === "/";
@@ -253,16 +267,16 @@ export function Navbar({ brandName, routes = [], action }) {
                     {user?.photoURL ? (
                       <img
                         src={user.photoURL}
-                        alt={user.displayName || "user"}
+                        alt={user.name || "user"}
                         className="h-8 w-8 rounded-full"
                       />
                     ) : (
                       <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-                        {user?.displayName?.[0]?.toUpperCase() || "U"}
+                        {user?.name?.[0]?.toUpperCase() || "U"}
                       </div>
                     )}
-                    <Typography variant="small" className="font-normal">
-                      {user?.displayName || "User"}
+                    <Typography variant="small" className="font-normal text-white">
+                      {user?.name || user?.displayName || "User"}
                     </Typography>
                   </div>
                 </Button>
