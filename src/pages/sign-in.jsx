@@ -9,6 +9,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, sig
 import { useState, useEffect } from "react";
 import { toast } from 'react-hot-toast';
 import { useAuth } from "../context/AuthContext";
+import axios from '../config/axios';
 
 export function SignIn() {
   const location = useLocation();
@@ -64,20 +65,45 @@ export function SignIn() {
     setIsLoading(true);
 
     try {
-      const result = await login(email, password);
-      
-      if (result?.success) {
-        console.log('Login successful:', result.user);
+      const response = await axios.post('/api/auth/login', {
+        email,
+        password
+      });
+
+      if (response.data.success) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        // Navigate to home page or the original requested page
-        const redirectPath = from || '/';  // Changed from '/profile' to '/'
+        // Dispatch a storage event to update the navbar
+        window.dispatchEvent(new Event('storage'));
+        
+        toast.success('Signed in successfully!');
+        
+        // Navigate to the intended page or home
+        const redirectPath = localStorage.getItem('redirectAfterLogin') || '/';
+        localStorage.removeItem('redirectAfterLogin');
         navigate(redirectPath, { replace: true });
-      } else {
-        setError(result?.error?.message || 'Failed to sign in');
       }
     } catch (error) {
-      console.error("Error during sign in:", error);
-      setError(error.message || 'An unexpected error occurred');
+      console.error('Error during sign in:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to sign in';
+      setError(errorMessage);
+      
+      // If the error is about unverified email, show a more helpful message
+      if (errorMessage.includes('verify your email')) {
+        toast.error('Please verify your email first. Check your inbox for the verification code.', {
+          duration: 5000
+        });
+        // Navigate to sign-up page with a message
+        navigate('/sign-up', { 
+          state: { 
+            message: 'Please verify your email first. Check your inbox for the verification code.',
+            email: email
+          } 
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -86,61 +112,36 @@ export function SignIn() {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      const result = await signInWithPopup(auth, googleProvider);
       
-      console.log('Google Auth User Data:', user); // Debug log
-
-      // Fix the API URL - remove the duplicate 'api'
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: user.displayName,
-          email: user.email,
-          googleId: user.uid,
-          photoUrl: user.photoURL,
-          emailVerified: user.emailVerified
-        })
+      // Send Google auth data to backend
+      const response = await axios.post('/api/auth/google', {
+        name: result.user.displayName,
+        email: result.user.email,
+        firebaseUid: result.user.uid,
+        photoURL: result.user.photoURL
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to sign in with Google');
+      if (response.data.success) {
+        // Store the JWT token and user data
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Dispatch storage event to update navbar
+        window.dispatchEvent(new Event('storage'));
+        
+        toast.success('Signed in with Google successfully!');
+        
+        // Navigate to the intended page or home
+        const redirectPath = localStorage.getItem('redirectAfterLogin') || '/';
+        localStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath, { replace: true });
       }
-
-      const data = await response.json();
-      console.log('Backend Response:', data); // Debug log
-
-      // Store user data in localStorage
-      const userData = {
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
-        photoURL: data.user.photoUrl,
-        role: data.user.role
-      };
-
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('token', data.token);
-
-      toast.success('Signed in with Google successfully!', {
-        id: 'auth-status'
-      });
-
-      // Navigate to home or intended page
-      const redirectPath = localStorage.getItem('redirectAfterLogin') || '/';
-      localStorage.removeItem('redirectAfterLogin');
-      navigate(redirectPath, { replace: true });
-
     } catch (error) {
       console.error('Google sign-in error:', error);
-      toast.error(error.message || 'Failed to sign in with Google', {
-        id: 'auth-status'
-      });
+      const errorMessage = error.response?.data?.message || 'Failed to sign in with Google';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -27,9 +27,8 @@ export function Navbar({ brandName, routes = [], action }) {
   const [profileError, setProfileError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAuthenticated } = useAuth();
-  const auth = getAuth();
   const [cartQuantity, setCartQuantity] = useState(0);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const hideNavigationRoutes = [
     '/cafes',
@@ -60,34 +59,63 @@ export function Navbar({ brandName, routes = [], action }) {
   // Define isHomePage based on current location
   const isHomePage = location.pathname === "/";
 
-  // Consolidate profile data loading into a single useEffect
+  // Check authentication status on mount and when localStorage changes
   useEffect(() => {
-    const loadProfileData = async () => {
-      try {
-        if (auth.currentUser) {
-          // Your profile loading logic here
-          setProfileError(null); // Clear any existing errors
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (token && userData) {
+        try {
+          const user = JSON.parse(userData);
+          setCurrentUser(user);
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          handleLogout();
         }
-      } catch (error) {
-        console.error('Error loading profile:', error);
-        setProfileError('Failed to load profile data');
-        // Show single toast notification with a unique ID
-        toast.error('Failed to load profile data', {
-          id: 'profile-error', // Unique ID to prevent duplicate toasts
-        });
+      } else {
+        setCurrentUser(null);
       }
     };
 
-    if (isAuthenticated) {
-      loadProfileData();
-    }
-  }, [auth.currentUser, isAuthenticated]);
+    // Check initially
+    checkAuth();
 
-  // Update cart quantity whenever localStorage changes
+    // Listen for storage changes
+    window.addEventListener('storage', checkAuth);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, []);
+
+  const isAuthenticated = Boolean(currentUser);
+
+  // Handle logout
+  const handleLogout = () => {
+    try {
+      // Clear local storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Clear user state
+      setCurrentUser(null);
+      
+      // Navigate to sign-in
+      navigate('/sign-in');
+      
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error("Logout error:", error);
+      navigate('/sign-in');
+    }
+  };
+
+  // Update cart quantity
   useEffect(() => {
     const updateCartQuantity = () => {
-      if (auth.currentUser) {
-        const cartKey = `cart_${auth.currentUser.uid}`;
+      if (currentUser) {
+        const cartKey = `cart_${currentUser.id}`;
         const savedCart = localStorage.getItem(cartKey);
         
         if (savedCart) {
@@ -107,16 +135,13 @@ export function Navbar({ brandName, routes = [], action }) {
       }
     };
 
-    // Update initially
     updateCartQuantity();
-
-    // Listen for cart updates
     window.addEventListener('cartUpdated', updateCartQuantity);
 
     return () => {
       window.removeEventListener('cartUpdated', updateCartQuantity);
     };
-  }, [auth.currentUser]);
+  }, [currentUser]);
 
   const handleQRScan = (data) => {
     try {
@@ -131,18 +156,6 @@ export function Navbar({ brandName, routes = [], action }) {
       toast.error("Invalid QR code", {
         id: 'qr-scan-error', // Unique ID to prevent duplicate toasts
       });
-    }
-  };
-
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/sign-in');
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Still navigate to sign-in since we've cleared local state
-      navigate('/sign-in');
     }
   };
 
@@ -191,7 +204,7 @@ export function Navbar({ brandName, routes = [], action }) {
           )}
         </Typography>
       ))}
-      {isAuthenticated && user?.email && (
+      {isAuthenticated && currentUser?.email && (
         <Typography
           key="user-email-nav"
           as="li"
@@ -200,7 +213,7 @@ export function Navbar({ brandName, routes = [], action }) {
           className="capitalize"
         >
           <span className="p-1 font-bold">
-           {/*Welcome, {user.email}*/}
+           {/*Welcome, {currentUser.email}*/}
           </span>
         </Typography>
       )}
@@ -264,19 +277,11 @@ export function Navbar({ brandName, routes = [], action }) {
                   className="flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 lg:ml-auto"
                 >
                   <div className="flex items-center gap-2">
-                    {user?.photoURL ? (
-                      <img
-                        src={user.photoURL}
-                        alt={user.name || "user"}
-                        className="h-8 w-8 rounded-full"
-                      />
-                    ) : (
-                      <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
-                        {user?.name?.[0]?.toUpperCase() || "U"}
-                      </div>
-                    )}
+                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                      {currentUser?.name?.[0]?.toUpperCase() || "U"}
+                    </div>
                     <Typography variant="small" className="font-normal text-white">
-                      {user?.name || user?.displayName || "User"}
+                      {currentUser?.name || "User"}
                     </Typography>
                   </div>
                 </Button>
