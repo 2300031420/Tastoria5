@@ -5,17 +5,13 @@ import {
 } from "@material-tailwind/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { toast } from 'react-hot-toast';
 import { FcGoogle } from "react-icons/fc";
-import { useAuth } from "../context/AuthContext";
 
 console.log('API URL:', import.meta.env.VITE_API_URL);
 
 export function SignUp() {
   const navigate = useNavigate();
-  const auth = getAuth();
-  const { signup } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,7 +21,6 @@ export function SignUp() {
   const [showOTPInput, setShowOTPInput] = useState(false);
   const [otp, setOTP] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [registrationEmail, setRegistrationEmail] = useState('');
   const [error, setError] = useState('');
 
   const handleInputChange = (e) => {
@@ -61,18 +56,30 @@ export function SignUp() {
         return;
       }
 
-      const result = await signup(formData.email, formData.password, formData.name);
-      
-      if (result?.success) {
-        setRegistrationEmail(formData.email);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
         setShowOTPInput(true);
         toast.success('OTP sent to your email!');
       } else {
-        setError(result?.error?.message || 'Failed to create account');
+        throw new Error(data.message || 'Failed to create account');
       }
     } catch (error) {
       console.error("Error during sign up:", error);
       setError(error.message || 'An unexpected error occurred');
+      toast.error(error.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
@@ -83,13 +90,13 @@ export function SignUp() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/verify-otp', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: registrationEmail,
+          email: formData.email,
           otp: otp
         })
       });
@@ -113,46 +120,11 @@ export function SignUp() {
   const handleGoogleSignUp = async () => {
     try {
       setIsLoading(true);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      console.log('Google Auth User Data:', user);
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: user.displayName,
-          email: user.email,
-          googleId: user.uid,
-          photoUrl: user.photoURL,
-          emailVerified: user.emailVerified
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to register with Google');
-      }
-
-      const data = await response.json();
-      console.log('Backend Response:', data);
-
-      localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('token', data.token);
-      
-      toast.success('Google sign-in successful!');
-      navigate('/');
+      // Implement Google OAuth here
+      toast.error('Google sign-up is not implemented yet');
     } catch (error) {
       console.error('Google signup error:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        toast.error('Sign-up cancelled');
-      } else {
-        toast.error(error.message || 'Google sign-up failed');
-      }
+      toast.error(error.message || 'Google sign-up failed');
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +146,12 @@ export function SignUp() {
             {showOTPInput ? 'Enter the verification code sent to your email.' : 'Enter your details to register.'}
           </Typography>
         </div>
+
+        {error && (
+          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
 
         {!showOTPInput ? (
           <>
