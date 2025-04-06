@@ -3,59 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { useCallback } from 'react';
 import { motion } from 'framer-motion';
-
-const restaurants = [
-  {
-    id: "hangout-cafe",
-    name: "Hangout Cafe",
-    image: "/img/Hangout.jpg",
-    description: "Experience authentic Italian cuisine in a cozy atmosphere. Known for our wood-fired pizzas and homemade pasta dishes.",
-    rating: 4.5,
-    reviews: 128,
-    cuisine: "Italian • Pizza • Pasta",
-    priceRange: "₹₹",
-    deliveryTime: "30-45 min"
-  },
-  {
-    id: "ttmm",
-    name: "TTMM",
-    image: "/img/ttmm.jpg",
-    description: "Gourmet burgers and artisanal fries in a modern setting. Our signature sauces and locally-sourced ingredients make every bite special.",
-    rating: 4.3,
-    reviews: 95,
-    cuisine: "Burgers • American • Fries",
-    priceRange: "₹₹₹",
-    deliveryTime: "25-35 min"
-  },
-  {
-    id: "cafe-house",
-    name: "Cafe House",
-    image: "/img/cafeHouse.jpg",
-    description: "A perfect blend of traditional and contemporary Japanese cuisine. Fresh sushi, sashimi, and innovative fusion dishes.",
-    rating: 4.7,
-    reviews: 156,
-    cuisine: "Japanese • Sushi • Asian",
-    priceRange: "₹₹₹₹",
-    deliveryTime: "35-50 min"
-  },
-  {
-  id:"Golden-bakery",
-  name:"Golden Bakery",
-  image: "/img/golden.jpg",
-  description:"A popular place where enjoy there meals and also has wide food ranges",
-  rating:4.8,
-  reviews:100,
-  cuisine:"Bakery • Cakes • Pastries",
-  priceRange:"₹₹₹",
-  deliveryTime:"20-30 min"
-  }
-];
+import axios from '../config/axios';
 
 function PreorderModal() {
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [authStatus, setAuthStatus] = useState('checking');
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [restaurants, setRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -103,6 +60,24 @@ function PreorderModal() {
     return () => unsubscribe();
   }, [auth, navigateWithTransition]);
 
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      try {
+        const response = await axios.get('/api/restaurants');
+        if (response.data.success) {
+          setRestaurants(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching restaurants:', error);
+        setError('Failed to load restaurants. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRestaurants();
+  }, []);
+
   const handleRestaurantClick = (restaurantId) => {
     if (authStatus === 'authenticated') {
       navigate('/preorderpage', {
@@ -118,11 +93,21 @@ function PreorderModal() {
     setIsModalOpen(false);
   };
 
-  if (authStatus === 'checking') {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#d0b290] to-[#e5d5bf]">
         <div className="animate-pulse text-2xl font-semibold text-gray-700">
           Loading amazing restaurants...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#d0b290] to-[#e5d5bf]">
+        <div className="text-2xl font-semibold text-red-600">
+          {error}
         </div>
       </div>
     );
@@ -171,11 +156,11 @@ function PreorderModal() {
             <div className="space-y-6 sm:space-y-8">
               {restaurants.map((restaurant) => (
                 <motion.div 
-                  key={restaurant.id}
+                  key={restaurant._id}
                   variants={itemVariants}
                   whileHover={{ scale: 1.02 }}
                   className={`bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300
-                    ${selectedRestaurant === restaurant.id ? 'ring-2 ring-blue-500' : ''}`}
+                    ${selectedRestaurant === restaurant._id ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <div className="flex flex-col sm:flex-row">
                     <div className="w-full sm:w-64 h-64 relative overflow-hidden">
@@ -221,7 +206,7 @@ function PreorderModal() {
                       </p>
 
                       <button
-                        onClick={() => handleRestaurantClick(restaurant.id)}
+                        onClick={() => handleRestaurantClick(restaurant._id)}
                         className="w-full sm:w-auto bg-blue-500 text-white py-3 px-8 rounded-lg
                           font-semibold hover:bg-blue-600 transition-all duration-300 
                           hover:shadow-lg active:transform active:scale-95 
