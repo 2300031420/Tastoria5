@@ -28,13 +28,7 @@
 - MongoDB (local or cloud instance)
 - Firebase project for Google Authentication
 
-### Installation
-
-```bash
-git clone https://github.com/2300031420/tastoria5.git
-cd tastoria5
-npm install
-🙏 Acknowledgements
+##  🙏 Acknowledgements
 We would like to sincerely thank:
 
 The Department of Computer Science & Engineering, KL University, for guiding and supporting us throughout this project.
@@ -48,3 +42,11 @@ The open-source community, whose packages, tools, and documentation enabled us t
 Figma, for helping us visualize and prototype the UI/UX design.
 
 Firebase, MongoDB, and Vercel, for providing robust and scalable infrastructure for authentication, database management, and deployment.
+
+
+### Installation
+
+```bash
+git clone https://github.com/2300031420/tastoria5.git
+cd tastoria5
+npm install
